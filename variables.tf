@@ -8,4 +8,3 @@ variable "resource_group_name" {
   default     = "rg-app-terraform"
 }
 
-

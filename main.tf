@@ -118,47 +118,83 @@ resource "azurerm_subnet" "subnet" {
 }
 
 # Create the Linux App Service Plan
-resource "azurerm_service_plan" "appserviceplan" {
+resource "azurerm_app_service_plan" "appserviceplan" {
   name                = "webapp-serviceplan"
   location            = var.resource_group_location
   resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = "B1"
+  kind                = "Linux"
+  sku {
+    tier = "Basic"
+    size = "B1"
+  }
 }
 
 # Create the web app, pass in the App Service Plan ID
-resource "azurerm_linux_web_app" "webapp1" {
+resource "azurerm_app_service" "webapp1" {
   name                  = "Levchenko-1"
   location              = var.resource_group_location
   resource_group_name   = var.resource_group_name
-  service_plan_id       = azurerm_service_plan.appserviceplan.id
+  app_service_plan_id   = azurerm_app_service_plan.appserviceplan.id
   https_only            = true
-  site_config { 
-    minimum_tls_version = "1.2"
+  app_settings = {
+    DOCKER_REGISTRY_SERVER_URL = "https://SergiiACR.azurecr.io"
+  }
+
+  # Configure Docker Image to load on start
+  site_config {
+    linux_fx_version = "DOCKER|SergiiACR.azurecr.io/samples/nginx:latest"
+    acr_use_managed_identity_credentials = true
+  }
+
+  identity {
+    type = "SystemAssigned"
   }
 }
 
 # Create the web app, pass in the App Service Plan ID
-resource "azurerm_linux_web_app" "webapp2" {
+resource "azurerm_app_service" "webapp2" {
   name                  = "Levchenko-2"
   location              = var.resource_group_location
   resource_group_name   = var.resource_group_name
-  service_plan_id       = azurerm_service_plan.appserviceplan.id
+  app_service_plan_id   = azurerm_app_service_plan.appserviceplan.id
   https_only            = true
-  site_config { 
-    minimum_tls_version = "1.2"
+  app_settings = {
+    DOCKER_REGISTRY_SERVER_URL = "https://SergiiACR.azurecr.io"
   }
+
+  # Configure Docker Image to load on start
+  site_config {
+    linux_fx_version = "DOCKER|SergiiACR.azurecr.io/samples/nginx:latest"
+    acr_use_managed_identity_credentials = true
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+}
+
+data "azurerm_container_registry" "this" {
+  name                = azurerm_container_registry.acr.name
+  resource_group_name = var.resource_group_name
+}
+
+resource "azurerm_role_assignment" "role-acr" {
+  for_each             = azurerm_app_service.webapp
+  
+  role_definition_name = "AcrPull"
+  scope                = azurerm_container_registry.this.id
+  principal_id         = each.value.identity[0].principal_id
 }
 
 # Swift connection1
 resource "azurerm_app_service_virtual_network_swift_connection" "swift1" {
-  app_service_id = azurerm_linux_web_app.webapp1.id
+  app_service_id = azurerm_app_service.webapp1.id
   subnet_id      = azurerm_subnet.subnet.id
 }
 
 # Swift connection2
 resource "azurerm_app_service_virtual_network_swift_connection" "swift2" {
-  app_service_id = azurerm_linux_web_app.webapp2.id
+  app_service_id = azurerm_app_service.webapp2.id
   subnet_id      = azurerm_subnet.subnet.id
 }
 
