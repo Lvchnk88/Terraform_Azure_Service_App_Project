@@ -10,4 +10,4 @@ PASSWORD="$3"
 
 docker logout
 docker login $SERVER -u $USERNAME -p $PASSWORD
-docker push $SERVER/samples/nginx
+docker push $SERVER/samples/httpd
